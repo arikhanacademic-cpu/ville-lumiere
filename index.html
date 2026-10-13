@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A 3D night map of Paris tech pay: 52 AI, tech, fintech and finance companies as towers sized by Levels.fyi France medians.">
+<title>Ville Lumière Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;1,6..96,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed WebGL night map of Paris; UI floats at the edges like enamel signage over a lamplit city. */
+:root{
+  color-scheme: dark;
+  --night:#0d1020;        /* sky & page ground */
+  --ink:#f3ecdc;          /* lamplight paper text */
+  --muted:#a7a3b4;
+  --panel:rgba(17,20,38,.86);
+  --line:rgba(243,236,220,.14);
+  --gold:#e8b64c;         /* accent: Paris lamplight */
+  --plaque:#1d3a6c;       /* street-sign enamel blue */
+  --plaque-edge:#2f7056;  /* street-sign green border */
+  --s-finance:#e8c26a; --s-fintech:#5cc8b8; --s-ai:#ec7f9f; --s-bigtech:#8fb3ff; --s-tech:#f29a5b;
+  --display:"Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --body:"Work Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--night);color:var(--ink);font-family:var(--body);font-size:14px;overflow:hidden;margin:0}
+#gl{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#gl.drag{cursor:grabbing}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;z-index:20;
+  background:linear-gradient(var(--night),rgba(13,16,32,0));pointer-events:none}
+.top > *{pointer-events:auto}
+.brand{display:flex;flex-direction:column;line-height:1.05;margin-right:auto;min-width:0}
+.brand b{font-family:var(--display);font-style:italic;font-weight:500;font-size:22px;letter-spacing:.01em}
+.brand span{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.seg{display:flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--panel);padding:3px;gap:2px}
+.seg small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0 6px 0 8px}
+.seg button{background:none;border:0;border-radius:999px;padding:5px 10px;cursor:pointer;font-size:12px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--night)}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:12px;color:var(--muted)}
+.search kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:4px;padding:1px 4px}
+
+/* tour chapter card */
+.chapter{position:fixed;left:16px;top:96px;width:min(380px,calc(100% - 32px));z-index:15;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:18px 20px 16px;backdrop-filter:blur(8px);transition:opacity .35s}
+.chapter .k{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--gold)}
+.chapter h2{font-family:var(--display);font-weight:500;font-size:30px;line-height:1.05;margin:6px 0 10px;text-wrap:balance}
+.chapter p{margin:0 0 10px;line-height:1.55;color:#ddd6c6;max-width:60ch}
+.chapter .gaston{font-family:var(--display);font-style:italic;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:999px;padding:4px 9px;font-size:12px;cursor:pointer}
+.chip i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.chip .mono{color:var(--muted);font-size:11px}
+.chip:hover{border-color:var(--gold)}
+.rides{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.ridebtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:999px;padding:7px 12px;cursor:pointer;font-weight:500}
+.roundel{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:600;font-family:var(--body)}
+.dots{position:fixed;right:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:15}
+.dots button{display:flex;align-items:center;justify-content:flex-end;gap:8px;background:none;border:0;cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10px;padding:2px 0}
+.dots button span{opacity:0;transition:opacity .2s;white-space:nowrap}
+.dots button:hover span,.dots button[aria-current="true"] span{opacity:1}
+.dots button i{width:6px;height:6px;border-radius:50%;background:var(--muted);display:block;transition:all .2s}
+.dots button[aria-current="true"]{color:var(--ink)}
+.dots button[aria-current="true"] i{background:var(--gold);width:10px;height:10px}
+
+/* rankings (explore) */
+.rank{position:fixed;left:16px;top:96px;bottom:64px;width:min(320px,calc(100% - 32px));z-index:15;background:var(--panel);border:1px solid var(--line);border-radius:4px;display:flex;flex-direction:column;backdrop-filter:blur(8px)}
+.rank header{padding:14px 16px 8px;border-bottom:1px solid var(--line)}
+.rank h3{margin:0;font-family:var(--display);font-weight:500;font-size:20px}
+.rank header p{margin:4px 0 8px;color:var(--muted);font-size:12px}
+.rank ol{list-style:none;margin:0;padding:6px 8px 10px;overflow:auto;flex:1}
+.rank li button{width:100%;display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:8px;background:none;border:0;padding:5px 8px;border-radius:3px;cursor:pointer;text-align:left}
+.rank li button:hover{background:rgba(255,255,255,.05)}
+.rank .n{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.rank .nm{min-width:0}
+.rank .nm b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank .bar{height:3px;border-radius:2px;margin-top:4px}
+.rank .v{font-family:var(--mono);font-size:12px}
+.rank .tog{position:absolute;right:10px;top:10px;background:none;border:0;color:var(--muted);cursor:pointer;font-size:12px}
+.rank.min{bottom:auto}
+.rank.min ol,.rank.min header p{display:none}
+
+/* legend */
+.legend{position:fixed;right:16px;bottom:44px;z-index:15;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:calc(100% - 32px)}
+.legend button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer}
+.legend button i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.legend button[aria-pressed="false"]{opacity:.4}
+
+.hint{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:14;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.credit{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:14;font-size:11px;color:var(--muted)}
+.credit a{color:var(--muted)}
+
+/* ride bar */
+.ridebar{position:fixed;left:50%;transform:translateX(-50%);top:84px;z-index:18;display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 10px 8px 12px;cursor:pointer;max-width:calc(100% - 32px)}
+.ridebar .t{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.ridebar .t b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ridebar .t small{color:var(--muted);font-size:11px}
+.ridebar .x{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:999px;padding:4px 8px;color:var(--muted);white-space:nowrap}
+
+/* company card */
+.card{position:fixed;right:16px;top:96px;width:min(370px,calc(100% - 32px));max-height:calc(100% - 160px);overflow:auto;z-index:25;background:var(--panel);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(10px)}
+.plaque{margin:14px 46px 0 14px;background:var(--plaque);border:3px solid var(--plaque-edge);outline:2px solid var(--plaque);border-radius:6px;padding:8px 12px 10px;text-align:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.plaque small{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.plaque h3{margin:2px 0 0;font-family:var(--body);font-weight:600;font-size:21px;letter-spacing:.02em;text-transform:uppercase;text-wrap:balance}
+.card .close{position:absolute;right:6px;top:16px;background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;z-index:2;padding:4px 8px}
+.card .body{padding:12px 16px 16px}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.sector{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 8px;border:1px solid var(--line);color:var(--ink)}
+.sector i{width:7px;height:7px;border-radius:50%}
+.roles{display:flex;gap:4px;margin:14px 0 10px;flex-wrap:wrap}
+.roles button{border:1px solid var(--line);background:none;border-radius:3px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--muted)}
+.roles button[aria-pressed="true"]{border-color:var(--gold);color:var(--ink)}
+.big{font-family:var(--display);font-size:44px;line-height:1;font-weight:500}
+.big-l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.split{display:flex;height:8px;border-radius:2px;overflow:hidden;margin:14px 0 6px;background:rgba(255,255,255,.06)}
+.split div{height:100%}
+.splitk{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.splitk div{font-size:11px;color:var(--muted)}
+.splitk b{display:block;color:var(--ink);font-family:var(--mono);font-weight:500;font-size:13px}
+.splitk i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:5px}
+table.lv{width:100%;border-collapse:collapse;margin-top:14px;font-size:12px}
+table.lv th{font-weight:500;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--line);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+table.lv th:first-child,table.lv td:first-child{text-align:left}
+table.lv td{padding:5px 4px;text-align:right;border-bottom:1px solid rgba(255,255,255,.05);font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.lv td:first-child{font-family:var(--body)}
+.note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 0 0}
+.lnk{display:inline-flex;margin-top:12px;color:var(--gold);text-decoration:none;font-weight:500;font-size:13px}
+.lnk:hover{text-decoration:underline}
+
+/* labels */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.lab{position:absolute;left:0;top:0;white-space:nowrap;font-size:11px;pointer-events:auto;cursor:pointer;transform-origin:0 0;display:flex;align-items:center;gap:5px;padding:2px 6px 2px 4px;border-radius:999px;background:rgba(13,16,32,.7);border:1px solid rgba(255,255,255,.08);will-change:transform}
+.lab i{width:6px;height:6px;border-radius:50%}
+.lab em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--muted)}
+.lab.hot{border-color:var(--gold);z-index:2}
+.lab.dim{opacity:.25}
+.lm{position:absolute;left:0;top:0;white-space:nowrap;font-family:var(--display);font-style:italic;font-size:13px;color:#e9dfc6;text-shadow:0 1px 6px #000;pointer-events:none;will-change:transform}
+.ar{position:absolute;left:0;top:0;font-family:var(--display);font-size:22px;color:rgba(243,236,220,.16);pointer-events:none;will-change:transform}
+.st{position:absolute;left:0;top:0;font-size:10px;color:#e9dfc6;pointer-events:none;white-space:nowrap;text-shadow:0 1px 4px #000}
+
+/* search */
+.modal{position:fixed;inset:0;z-index:40;background:rgba(5,6,14,.6);display:flex;justify-content:center;align-items:flex-start;padding:90px 16px 16px}
+.modal .box{width:min(480px,100%);background:#14182d;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.modal input{width:100%;box-sizing:border-box;background:none;border:0;border-bottom:1px solid var(--line);padding:14px 16px;font:inherit;font-size:16px;color:var(--ink);outline:none}
+.modal ul{list-style:none;margin:0;padding:6px;max-height:50vh;overflow:auto}
+.modal li button{width:100%;display:flex;justify-content:space-between;gap:10px;align-items:center;background:none;border:0;padding:8px 10px;border-radius:4px;cursor:pointer;text-align:left}
+.modal li button[aria-selected="true"],.modal li button:hover{background:rgba(255,255,255,.07)}
+.modal li small{color:var(--muted)}
+
+/* loader */
+.loader{position:fixed;inset:0;z-index:60;background:var(--night);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity .8s}
+.loader b{font-family:var(--display);font-size:clamp(34px,8vw,72px);font-weight:500;letter-spacing:.12em}
+.loader span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.loader.done{opacity:0;pointer-events:none}
+
+@media (max-width:720px){
+  .brand b{font-size:19px}
+  .brand span{display:none}
+  .search span{display:none}
+  .seg small{display:none}
+  .chapter{top:auto;bottom:40px;padding:14px 16px 12px;max-height:46%;overflow:auto}
+  .chapter h2{font-size:24px}
+  .chapter .gaston{display:none}
+  .dots{display:none}
+  .legend{display:none}
+  .credit{display:none}
+  .card{top:auto;bottom:16px;max-height:62%}
+  .rank{top:auto;bottom:40px;height:40%}
+  body.has-card .rank{display:none}
+  .ridebar{top:120px}
+  .hint{font-size:10px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="3D map of Paris with tech companies shown as glowing towers"></canvas>
+<div id="labels"></div>
+
+<header class="top">
+  <div class="brand"><b>Ville Lumière</b><span>a living atlas of Paris tech pay</span></div>
+  <button class="search" id="searchBtn" type="button" aria-label="Search companies">⌕ <span>Search companies</span> <kbd>⌘K</kbd></button>
+  <div class="seg" role="group" aria-label="View"><small>view</small><button id="vTour" type="button" aria-pressed="true">Tour</button><button id="vExplore" type="button" aria-pressed="false">Explore</button></div>
+  <div class="seg" role="group" aria-label="Labels"><small>labels</small><button id="lAll" type="button" aria-pressed="true">All</button><button id="lKey" type="button" aria-pressed="false">Key</button></div>
+  <div class="seg" role="group" aria-label="Currency" id="cur"><button type="button" data-c="EUR" aria-pressed="true">€</button><button type="button" data-c="USD" aria-pressed="false">$</button><button type="button" data-c="GBP" aria-pressed="false">£</button></div>
+</header>
+
+<section class="chapter" id="chapter" aria-live="polite"></section>
+<nav class="dots" id="dots" aria-label="Tour chapters"></nav>
+
+<aside class="rank" id="rank" hidden>
+  <button class="tog" id="rankTog" type="button">Hide</button>
+  <header><h3>Who pays most</h3><p>Median total comp in France, by role. Click a name to fly there.</p>
+    <div class="seg" role="group" aria-label="Ranking role" id="rankRole"></div></header>
+  <ol id="rankList"></ol>
+</aside>
+
+<div class="legend" id="legend"></div>
+<div class="ridebar" id="ridebar" hidden role="button" tabindex="0"></div>
+
+<aside class="card" id="card" hidden></aside>
+
+<div class="hint" id="hint">scroll to descend · drag to orbit · click any tower</div>
+<div class="credit">Data: <a href="https://www.levels.fyi" target="_blank" rel="noopener">Levels.fyi</a> France medians, Oct 2026 · Fan project by Ari Khan, inspired by Levels.fyi's Peninsula atlas</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="box" role="dialog" aria-label="Search companies">
+    <input id="q" type="text" placeholder="Search 52 companies…" autocomplete="off">
+    <ul id="qList"></ul>
+  </div>
+</div>
+
+<div class="loader" id="loader"><b>VILLE LUMIÈRE</b><span id="loadMsg">Filling the Seine…</span><span>48.8566° N, 2.3522° E</span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="data.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
